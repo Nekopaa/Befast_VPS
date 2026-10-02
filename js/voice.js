@@ -114,47 +114,68 @@ function parseNominal(str) {
   if (!str) return 0;
   let raw = str.toLowerCase().replace(/tanggal\s*\d{1,2}/gi, '').replace(/tahun\s*\d{4}/gi, '').replace(/rp|rupiah/gi, '').trim();
   raw = raw.replace(/\b\d+\s*(porsi|bungkus|piring|orang|buah|butir)\b/gi, '');
-  raw = raw.replace(/(\d+)([a-z]+)/gi, '$1 $2');
-  
-  const slangMap = { 'gocap': '50 ribu', 'cepek': '100 ribu', 'gopek': '500 ribu', 'seceng': '1 ribu', 'goceng': '5 ribu', 'ceban': '10 ribu', 'goban': '50 ribu', 'pekgo': '150 ribu', 'tigo': '30 ribu' };
-  for (const [slang, value] of Object.entries(slangMap)) {
-    raw = raw.replace(new RegExp(`\\b${slang}\\b`, 'gi'), value);
-  }
 
-  let matches = raw.match(/\d{1,3}(?:\.\d{3})+(?:,\d+)?|\d{1,3}(?:,\d{3})+(?:\.\d+)?/g);
-  if(matches && matches.length > 0) {
-    let maxVal = 0;
-    for (let match of matches) { 
-      let cleanNumStr = match.split(',')[0].replace(/\./g, ''); 
-      let val = parseInt(cleanNumStr, 10); 
-      if (!isNaN(val) && val > maxVal) maxVal = val; 
+  // 1. Tangkap angka numerik langsung jika user menyebutkan format angka (contoh: 252241 atau 2.541)
+  let directMatches = raw.match(/\d{1,3}(?:\.\d{3})+(?:,\d+)?|\d{1,3}(?:,\d{3})+(?:\.\d+)?|\d+/g);
+  if (directMatches && directMatches.length > 0) {
+    // Jika ada angka utuh yang panjang atau ada kata "ribu/juta" di dekatnya, kita proses
+    let joined = directMatches.join('');
+    if (!raw.includes('juta') && !raw.includes('ribu') && !raw.includes('miliar') && plainNumberIsValid(raw, joined)) {
+      return parseInt(joined, 10);
     }
-    if (maxVal > 0) return maxVal;
   }
 
-  let text = raw.replace(/ jt /g, 'juta').replace(/ sejuta /g, '1 juta').replace(/ seribu /g, '1 ribu').replace(/ seratus /g, '1 ratus');
-  const wordMap = { 'nol': 0, 'satu': 1, 'dua': 2, 'tiga': 3, 'empat': 4, 'lima': 5, 'enam': 6, 'tujuh': 7, 'delapan': 8, 'sembilan': 9 };
-  let tokens = text.split(/[\s]+/); let grandTotal = 0; let currentGroup = 0; let tempVal = 0; let foundNumber = false;
-  
-  for (let i = 0; i < tokens.length; i++) {
-    let t = tokens[i].replace(/[^\w\.]/g, ''); if (!t) continue; let cleanT = t.replace(/\./g, ''); let num = parseFloat(cleanT);
-    if (!isNaN(num) && !['juta', 'ribu', 'rb', 'k', 'miliar', 'milyar', 'ratus'].includes(cleanT)) { tempVal += num; foundNumber = true; }
-    else if (wordMap[cleanT] !== undefined) { tempVal += wordMap[cleanT]; foundNumber = true; }
-    else if (cleanT === 'belas') { if (tempVal === 0) tempVal = 1; currentGroup += tempVal + 10; tempVal = 0; foundNumber = true; }
-    else if (cleanT === 'puluh') { if (tempVal === 0) tempVal = 1; currentGroup += tempVal * 10; tempVal = 0; foundNumber = true; }
-    else if (cleanT === 'ratus') { if (tempVal === 0) tempVal = 1; currentGroup += tempVal * 100; tempVal = 0; foundNumber = true; }
-    else if (cleanT === 'ribu' || cleanT === 'rb' || cleanT === 'k') { let groupSum = currentGroup + tempVal; if (groupSum === 0) groupSum = 1; grandTotal += groupSum * 1000; currentGroup = 0; tempVal = 0; foundNumber = true; }
-    else if (cleanT === 'juta') { let groupSum = currentGroup + tempVal; if (groupSum === 0) groupSum = 1; grandTotal += groupSum * 1000000; currentGroup = 0; tempVal = 0; foundNumber = true; }
-    else if (cleanT === 'miliar' || cleanT === 'milyar') { let groupSum = currentGroup + tempVal; if (groupSum === 0) groupSum = 1; grandTotal += groupSum * 1000000000; currentGroup = 0; tempVal = 0; foundNumber = true; }
+  // 2. Kamus slang/bahasa gaul
+  const slangMap = { 'gocap': 50000, 'cepek': 100000, 'gopek': 500000, 'seceng': 1000, 'goceng': 5000, 'ceban': 10000, 'goban': 50000, 'pekgo': 150000, 'tigo': 30000 };
+  for (const [slang, val] of Object.entries(slangMap)) {
+    if (new RegExp(`\\b${slang}\\b`, 'gi').test(raw)) return val;
   }
-  grandTotal += currentGroup + tempVal; 
-  if (foundNumber && grandTotal > 0) return Math.round(grandTotal); 
-  
-  // Tangkap angka gabungan panjang seperti "252241"
-  let plainNum = raw.replace(/\D/g, '');
-  if (plainNum.length > 0) return parseInt(plainNum, 10);
 
-  return 0;
+  // 3. Parser Verbal Terstruktur (Mengubah kata-kata "dua juta lima ratus empat puluh satu ribu" menjadi angka pasti)
+  const words = raw.replace(/[^a-z\s]/g, '').split(/\s+/);
+  let total = 0;
+  let currentSegment = 0;
+  let currentMultiplier = 1;
+
+  const numWords = {
+    'satu': 1, 'se': 1, 'dua': 2, 'tiga': 3, 'empat': 4, 'lima': 5, 
+    'enam': 6, 'tujuh': 7, 'delapan': 8, 'sembilan': 9, 'sepuluh': 10, 'sebelas': 11
+  };
+
+  for (let i = 0; i < words.length; i++) {
+    let w = words[i];
+    if (w === 'belas') {
+      currentSegment += 10;
+    } else if (w === 'puluh') {
+      currentSegment = (currentSegment === 0 ? 1 : currentSegment) * 10;
+    } else if (w === 'ratus') {
+      currentSegment = (currentSegment === 0 ? 1 : currentSegment) * 100;
+    } else if (w === 'ribu' || w === 'rb' || w === 'k') {
+      currentSegment = (currentSegment === 0 ? 1 : currentSegment) * 1000;
+      total += currentSegment;
+      currentSegment = 0;
+    } else if (w === 'juta' || w === 'jt') {
+      currentSegment = (currentSegment === 0 ? 1 : currentSegment) * 1000000;
+      total += currentSegment;
+      currentSegment = 0;
+    } else if (w === 'miliar' || w === 'milyar') {
+      currentSegment = (currentSegment === 0 ? 1 : currentSegment) * 1000000000;
+      total += currentSegment;
+      currentSegment = 0;
+    } else if (numWords[w] !== undefined) {
+      currentSegment += numWords[w];
+    } else if (!isNaN(parseInt(w))) {
+      currentSegment += parseInt(w, 10);
+    }
+  }
+
+  total += currentSegment;
+  return total > 0 ? total : 0;
+}
+
+function plainNumberIsValid(raw, joined) {
+  // Hanya ambil sebagai angka langsung jika tidak ada kata ribuan verbal yang rancu
+  return joined.length <= 8 && !raw.includes('ribu') && !raw.includes('juta');
 }
 
 function extractTransactionDetails(cmd, type) {
