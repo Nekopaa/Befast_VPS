@@ -277,40 +277,22 @@ async function handleSendResetEmail(e) {
 
   if (!email) return alert('Masukkan email kamu.');
 
-  // Validasi Format Email Resmi (Harus berakhiran @gmail.com atau @yahoo.com)
-  const emailRegex = /^[a-zA-Z0-9._%+-]+@(gmail\.com|yahoo\.com)$/;
-  if (!emailRegex.test(email)) {
-    return alert('Format email tidak valid! Gunakan email yang benar (contoh: nama@gmail.com).');
-  }
-
   btn.disabled = true;
-  btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Memeriksa...';
+  btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Mengirim...';
 
   try {
-    // Validasi Cek Database: Apakah email ini terdaftar di tabel users?
-    const { data: checkUser, error: dbError } = await supabaseClient
-      .from('users')
-      .select('id')
-      .eq('email', email)
-      .maybeSingle();
-
-    if (dbError || !checkUser) {
-      throw new Error('Email ini tidak terdaftar di database kami. Pastikan email yang kamu masukkan benar.');
-    }
-
-    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Mengirim...';
-
-    // Jika email terbukti asli dan terdaftar, kirim tautan reset via Supabase Auth
-    const { error: resetError } = await supabaseClient.auth.resetPasswordForEmail(email, {
-      redirectTo: window.location.href,
+    const response = await fetch('api-auth.php?action=forgot-password', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: email })
     });
+    const result = await response.json();
 
-    if (resetError) throw resetError;
+    if (!result.success) throw new Error(result.message);
 
     closeForgotEmailModal();
     document.getElementById('forgotSuccessModal').classList.remove('hidden');
-    if (typeof speak === 'function') speak("Reset password sudah dikirim ke email kamu.");
-
+    if (typeof speak === 'function') speak("Tautan reset sandi sudah dikirim ke email kamu.");
   } catch (err) {
     alert(err.message || 'Gagal memproses permintaan.');
   } finally {
@@ -330,41 +312,7 @@ if (supabaseClient) {
   });
 }
 
-// 3. Simpan Password Baru & Konfirmasi
-async function handleUpdateNewPassword(e) {
-  e.preventDefault();
-  const pass1 = document.getElementById('newPasswordInput').value;
-  const pass2 = document.getElementById('confirmPasswordInput').value;
-  const btn = document.getElementById('btnUpdatePassword');
 
-  if (pass1.length < 6) {
-    return alert('Kata sandi minimal harus 6 karakter.');
-  }
-
-  if (pass1 !== pass2) {
-    return alert('Konfirmasi kata sandi tidak cocok! Pastikan keduanya sama.');
-  }
-
-  btn.disabled = true;
-  btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Menyimpan...';
-
-  try {
-    const { error } = await supabaseClient.auth.updateUser({ password: pass1 });
-    if (error) throw error;
-
-    alert('Kata sandi berhasil diperbarui! Silakan masuk kembali menggunakan sandi baru.');
-    document.getElementById('newPasswordModal').classList.add('hidden');
-    if (typeof speak === 'function') speak("Kata sandi berhasil diperbarui.");
-    
-    // Logout otomatis agar user login ulang dengan aman
-    await handleLogout();
-  } catch (err) {
-    alert('Gagal memperbarui sandi: ' + err.message);
-  } finally {
-    btn.disabled = false;
-    btn.innerHTML = 'Simpan Sandi Baru';
-  }
-}
 
 // --- MODAL KONTROL LUPA SANDI ---
 function openForgotEmailModal() {
