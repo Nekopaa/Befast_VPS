@@ -350,46 +350,31 @@ async function handleSendResetEmail(e) {
   const email = document.getElementById('forgotEmailInput').value.trim().toLowerCase();
   const btn = document.getElementById('btnSendReset');
 
-  if (!email) return showForgotAlert('Masukkan email kamu.');
-
-  const emailRegex = /^[a-zA-Z0-9._%+-]+@(gmail\.com|yahoo\.com)$/;
-  if (!emailRegex.test(email)) {
-    return showForgotAlert('Format email tidak valid! Gunakan email yang benar (contoh: nama@gmail.com).');
-  }
+  if (!email) return alert('Masukkan email kamu.');
 
   btn.disabled = true;
-  btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Memeriksa...';
+  btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Mengirim...';
 
   try {
-    const { data: checkUser, error: dbError } = await supabaseClient
-      .from('users')
-      .select('id')
-      .eq('email', email)
-      .maybeSingle();
-
-    if (dbError || !checkUser) {
-      throw new Error('Email ini tidak terdaftar di database kami. Pastikan email yang kamu masukkan benar.');
-    }
-
-    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Mengirim...';
-
-    const { error: resetError } = await supabaseClient.auth.resetPasswordForEmail(email, {
-      redirectTo: window.location.origin + window.location.pathname,
+    const response = await fetch('api-auth.php?action=forgot-password', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: email })
     });
+    const result = await response.json();
 
-    if (resetError) throw resetError;
+    if (!result.success) throw new Error(result.message);
 
     closeForgotEmailModal();
     document.getElementById('forgotSuccessModal').classList.remove('hidden');
-    if (typeof speak === 'function') speak("Reset password sudah dikirim ke email kamu.");
+    if (typeof speak === 'function') speak("Tautan reset sandi sudah dikirim ke email kamu.");
   } catch (err) {
-    showForgotAlert(err.message || 'Gagal memproses permintaan.');
+    alert(err.message || 'Gagal memproses permintaan.');
   } finally {
     btn.disabled = false;
     btn.innerHTML = 'Kirim Tautan Reset';
   }
 }
-
 // 2. DETEKSI TOKEN HASH DARI URL EMAIL SUPABASE (Agar modal sandi baru langsung muncul)
 window.addEventListener('DOMContentLoaded', () => {
   const hash = window.location.hash;
