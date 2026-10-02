@@ -58,15 +58,15 @@ window.resolveAmbiguity = async function(id) {
   if(typeof updateSyncStatusUI === 'function') updateSyncStatusUI(false, 'Memproses...');
   
   if (action.type === 'delete') {
-    const response = await fetch('api-transactions.php', {
+    const res = await fetch('api-transactions.php', {
       method: 'DELETE',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ id: id })
     });
-    const result = await response.json();
+    const result = await res.json();
     if (result.success) speak("Sip! Berhasil dihapus.");
   } else if (action.type === 'edit') {
-    // Untuk edit via suara, kita sesuaikan endpoint jika diperlukan
+    // Aksi edit via API jika diperlukan
     speak(action.successText);
   }
   
@@ -171,6 +171,14 @@ function extractTransactionDetails(cmd, type) {
   return { amount, desc, date: transactionDate };
 }
 
+function parseDateScopeFromCommand(cmd) {
+  let periodLabel = "keseluruhan"; let filterFunc = () => true;
+  if (cmd.includes('bulan lalu') || cmd.includes('bulan kemarin')) return { label: "bulan lalu", func: t => t.date.startsWith(getRelativeDateStr('bulan_lalu').ym) };
+  if (cmd.includes('hari ini')) return { label: "hari ini", func: t => t.date === getLocalDateStr() };
+  if (cmd.includes('kemarin')) return { label: "kemarin", func: t => t.date === getRelativeDateStr('kemarin').full };
+  return { label: periodLabel, func: filterFunc };
+}
+
 async function executeVoiceDelete(cmd) {
   let isIncome = cmd.includes('pemasukan') || cmd.includes('masuk'); 
   let isExpense = cmd.includes('pengeluaran') || cmd.includes('keluar') || cmd.includes('beli') || cmd.includes('bayar');
@@ -204,11 +212,25 @@ async function executeVoiceDelete(cmd) {
   }
 }
 
+function executeVoiceDownload(cmd) { openExportModal(); speak("Silakan download laporannya."); }
+
+function executeVoiceReadout(cmd) {
+  let scope = parseDateScopeFromCommand(cmd);
+  let filtered = transactions.filter(t => scope.label === 'keseluruhan' || scope.func(t));
+  if (filtered.length === 0) return speak("Tidak ada catatan transaksi.");
+  let inTotal = filtered.filter(t => t.type === 'pemasukan').reduce((s, t) => s + t.amount, 0);
+  let exTotal = filtered.filter(t => t.type === 'pengeluaran').reduce((s, t) => s + t.amount, 0);
+  speak(`Total pemasukan ${inTotal.toLocaleString('id-ID')} rupiah, total pengeluaran ${exTotal.toLocaleString('id-ID')} rupiah.`);
+}
+
 async function processVoiceCommand(cmd) {
   const user = getCurrentUser(); 
   if (!user) { openLoginModal(); return; }
   
   if (cmd.includes('hapus') || cmd.includes('delete') || cmd.includes('buang')) { executeVoiceDelete(cmd); return; }
+  if (cmd.includes('download') || cmd.includes('unduh') || cmd.includes('ekspor')) { executeVoiceDownload(cmd); return; }
+  if (cmd.includes('grafik') || cmd.includes('chart')) { showChartModal(cmd); return; }
+  if (cmd.includes('baca') || cmd.includes('cek') || cmd.includes('spill') || cmd.includes('total')) { executeVoiceReadout(cmd); return; }
 
   let subCommands = cmd.split(/\s+(?:dan|terus|lalu|serta)\s+|,+/g);
   let successCount = 0;
@@ -258,6 +280,16 @@ async function processVoiceCommand(cmd) {
   }
 }
 
+// --- KAMUS KOREKSI SUARA (AUTO-CORRECT) ---
+function applyVoiceCorrections(text) {
+  let corrected = text.toLowerCase();
+  const corrections = { 'copy': 'kopi', 'the': 'teh', 'project': 'gojek', 'st': 'es teh', 'grab foot': 'grabfood', 'go foot': 'gofood' };
+  for (const [wrong, right] of Object.entries(corrections)) {
+    corrected = corrected.replace(new RegExp(`\\b${wrong}\\b`, 'gi'), right);
+  }
+  return corrected;
+}
+
 const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 let recognition = null; let isListening = false; let transcript = '';
 
@@ -275,7 +307,8 @@ if (SpeechRecognition) {
   };
   
   recognition.onresult = (e) => { 
-    transcript = Array.from(e.results).map(r => r[0].transcript).join(''); 
+    let raw = Array.from(e.results).map(r => r[0].transcript).join(''); 
+    transcript = applyVoiceCorrections(raw);
     document.getElementById('transcriptText').innerText = `"${transcript}"`; 
   };
   
