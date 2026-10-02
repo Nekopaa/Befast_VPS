@@ -64,13 +64,6 @@ window.resolveAmbiguity = async function(id) {
       body: JSON.stringify({ id: id })
     });
     speak("Sip! Berhasil dihapus.");
-  } else if (action.type === 'edit') {
-    await fetch('api-transactions.php', {
-      method: 'POST', // atau sesuaikan endpoint update
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'update', id: id, ...action.payload })
-    });
-    speak(action.successText);
   }
   
   cancelAmbiguity();
@@ -116,6 +109,7 @@ function speak(text) {
   window.speechSynthesis.speak(utterance);
 }
 
+// PARSER NOMINAL CERDAS (Mendukung angka numerik, juta, milyar, dan ratusan juta)
 function parseNominal(str) {
   if (!str) return 0;
   let raw = str.toLowerCase().replace(/tanggal\s*\d{1,2}/gi, '').replace(/tahun\s*\d{4}/gi, '').replace(/rp|rupiah/gi, '').trim();
@@ -137,6 +131,29 @@ function parseNominal(str) {
     }
     if (maxVal > 0) return maxVal;
   }
+
+  let text = raw.replace(/ jt /g, 'juta').replace(/ sejuta /g, '1 juta').replace(/ seribu /g, '1 ribu').replace(/ seratus /g, '1 ratus');
+  const wordMap = { 'nol': 0, 'satu': 1, 'dua': 2, 'tiga': 3, 'empat': 4, 'lima': 5, 'enam': 6, 'tujuh': 7, 'delapan': 8, 'sembilan': 9 };
+  let tokens = text.split(/[\s]+/); let grandTotal = 0; let currentGroup = 0; let tempVal = 0; let foundNumber = false;
+  
+  for (let i = 0; i < tokens.length; i++) {
+    let t = tokens[i].replace(/[^\w\.]/g, ''); if (!t) continue; let cleanT = t.replace(/\./g, ''); let num = parseFloat(cleanT);
+    if (!isNaN(num) && !['juta', 'ribu', 'rb', 'k', 'miliar', 'milyar', 'ratus'].includes(cleanT)) { tempVal += num; foundNumber = true; }
+    else if (wordMap[cleanT] !== undefined) { tempVal += wordMap[cleanT]; foundNumber = true; }
+    else if (cleanT === 'belas') { if (tempVal === 0) tempVal = 1; currentGroup += tempVal + 10; tempVal = 0; foundNumber = true; }
+    else if (cleanT === 'puluh') { if (tempVal === 0) tempVal = 1; currentGroup += tempVal * 10; tempVal = 0; foundNumber = true; }
+    else if (cleanT === 'ratus') { if (tempVal === 0) tempVal = 1; currentGroup += tempVal * 100; tempVal = 0; foundNumber = true; }
+    else if (cleanT === 'ribu' || cleanT === 'rb' || cleanT === 'k') { let groupSum = currentGroup + tempVal; if (groupSum === 0) groupSum = 1; grandTotal += groupSum * 1000; currentGroup = 0; tempVal = 0; foundNumber = true; }
+    else if (cleanT === 'juta') { let groupSum = currentGroup + tempVal; if (groupSum === 0) groupSum = 1; grandTotal += groupSum * 1000000; currentGroup = 0; tempVal = 0; foundNumber = true; }
+    else if (cleanT === 'miliar' || cleanT === 'milyar') { let groupSum = currentGroup + tempVal; if (groupSum === 0) groupSum = 1; grandTotal += groupSum * 1000000000; currentGroup = 0; tempVal = 0; foundNumber = true; }
+  }
+  grandTotal += currentGroup + tempVal; 
+  if (foundNumber && grandTotal > 0) return Math.round(grandTotal); 
+  
+  // Tangkap angka gabungan panjang seperti "252241"
+  let plainNum = raw.replace(/\D/g, '');
+  if (plainNum.length > 0) return parseInt(plainNum, 10);
+
   return 0;
 }
 
@@ -158,13 +175,13 @@ function extractTransactionDetails(cmd, type) {
     } 
   }
   
-  // REGEX PEMBERSIH KETERANGAN YANG KUAT (MEMBUANG KATA PERINTAH & NOMINAL)
   let desc = cmd
-    .replace(/\b(pemasukan|pengeluaran|masuk|keluar|beli|bayar|dapet|dapat|catat|tambah|tolong|edit|ubah|ganti|jadi|menjadi)\b/gi, '')
+    .replace(/\b(pemasukan|pengeluaran|masuk|keluar|beli|bayar|dapet|dapat|catat|tambah|tolong)\b/gi, '')
     .replace(/\b(kemarin|kemaren|hari ini|tanggal\s*\d{1,2})\b/gi, '')
     .replace(/rp\s*\d+([.,]\d+)?/gi, '')
     .replace(/\b\d{1,3}(\.\d{3})+(,\d+)?\b|\b\d{1,3}(,\d{3})+(\.\d+)?\b/g, '')
-    .replace(/\b\d+\s*(ribu|rb|k|juta|jt)\b/gi, '')
+    .replace(/\b\d+\b/g, '') // Bersihkan sisa angka tunggal
+    .replace(/\b\d+\s*(ribu|rb|k|juta|jt|miliar|milyar)\b/gi, '')
     .replace(/\b(gocap|cepek|gopek|seceng|goceng|ceban|goban|pekgo|tigo)\b/gi, '')
     .replace(/[.,]/g, '')
     .replace(/\s+/g, ' ')
@@ -189,9 +206,17 @@ async function executeVoiceDelete(cmd) {
   let isExpense = cmd.includes('pengeluaran') || cmd.includes('keluar') || cmd.includes('beli') || cmd.includes('bayar');
   let isBulkDelete = cmd.includes('semua') || cmd.includes('semuanya'); 
   
+  // Ekstrak keyword nama barang (contoh: "bebek") dari perintah hapus
+  let keyword = cmd
+    .replace(/(hapus|delete|hilangin|bersihin|buang|pemasukan|pengeluaran|masuk|keluar|dapet|dapat|beli|bayar|semua|semuanya)/gi, '')
+    .replace(/(kemarin|kemaren|hari ini|bulan ini|bulan lalu|tanggal\s*\d{1,2})/gi, '')
+    .trim();
+
   let itemsToDelete = transactions.filter(t => {
     if (isIncome && t.type !== 'pemasukan') return false; 
     if (isExpense && t.type !== 'pengeluaran') return false;
+    // Jika ada keyword spesifik (seperti "bebek"), pastikan deskripsi mengandung keyword tersebut
+    if (keyword && !t.desc.toLowerCase().includes(keyword.toLowerCase())) return false;
     return true;
   });
 
@@ -199,6 +224,7 @@ async function executeVoiceDelete(cmd) {
   
   if (itemsToDelete.length === 1 || isBulkDelete) {
     if(typeof updateSyncStatusUI === 'function') updateSyncStatusUI(false, 'Menghapus data...');
+    
     for (let item of itemsToDelete) {
       await fetch('api-transactions.php', {
         method: 'DELETE',
@@ -206,6 +232,7 @@ async function executeVoiceDelete(cmd) {
         body: JSON.stringify({ id: item.id })
       });
     }
+    
     if (typeof fetchTransactionsFromSupabase === 'function') await fetchTransactionsFromSupabase(); 
     speak(itemsToDelete.length > 1 ? `Sip! Berhasil menghapus ${itemsToDelete.length} data sekaligus.` : `Sip! Berhasil dihapus.`); 
   } else {
@@ -215,95 +242,21 @@ async function executeVoiceDelete(cmd) {
   }
 }
 
-async function executeVoiceEdit(cmd) {
-  let newAmount = parseNominal(cmd);
-  let targetType = null; 
-  if (/(pemasukan|masuk|dapat|dapet)/i.test(cmd)) targetType = 'pemasukan'; 
-  if (/(pengeluaran|keluar|beli|bayar)/i.test(cmd)) targetType = 'pengeluaran';
-  
-  let keyword = cmd.replace(/(ubah|edit|ganti|jadi|menjadi|pemasukan|pengeluaran|masuk|keluar|beli|bayar|dapet|dapat)/gi, '').replace(/rp\s*\d+([.,]\d+)?/gi, '').trim();
-
-  let matches = transactions.filter(t => {
-    if (targetType && t.type !== targetType) return false;
-    return true;
-  });
-
-  if (matches.length === 0) return speak("Aduh, data transaksi yang mau diedit gak ditemukan nih.");
-  
-  let payload = null;
-  let speakText = "";
-  if (newAmount > 0) {
-    payload = { amount: newAmount };
-    speakText = `Sip! Nominal diubah jadi ${newAmount.toLocaleString('id-ID')} rupiah.`;
-  } else {
-    let parts = cmd.split(/ (jadi|menjadi) /i);
-    if (parts.length >= 3) {
-      let newDesc = parts.slice(2).join(' ').trim();
-      newDesc = newDesc.charAt(0).toUpperCase() + newDesc.slice(1);
-      payload = { desc: newDesc, category: typeof detectCategory === 'function' ? detectCategory(newDesc, matches[0].type) : 'Lain-lain' };
-      speakText = `Sip! Keterangan diubah menjadi ${newDesc}.`;
-    } else {
-      return speak("Sebutkan nominal baru atau nama baru. Contoh: Edit kopi jadi tiga puluh ribu.");
-    }
-  }
-
-  if (matches.length === 1) {
-    if(typeof updateSyncStatusUI === 'function') updateSyncStatusUI(false, 'Menyimpan...');
-    // Kirim update ke API PHP VPS
-    await fetch('api-transactions.php', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'update', id: matches[0].id, ...payload })
-    });
-    await fetchTransactionsFromSupabase(); 
-    speak(speakText);
-  } else {
-    window.pendingVoiceAction = { type: 'edit', payload: payload, successText: speakText };
-    showAmbiguitySelection(matches);
-    speak(`Ada ${matches.length} data yang cocok. Tolong tap mana yang mau diedit di layar.`);
-  }
-}
-
 function executeVoiceDownload(cmd) { openExportModal(); speak("Silakan download laporannya."); }
 
-// PENGEMBALIAN FITUR CEK LAPORAN / SPILL LENGKAP SEPERTI SEMULA
 function executeVoiceReadout(cmd) {
   let scope = parseDateScopeFromCommand(cmd);
   let filtered = transactions.filter(t => scope.label === 'keseluruhan' || scope.func(t));
-  
-  if (filtered.length === 0) {
-    return speak(`Tidak ada catatan transaksi untuk ${scope.label}.`);
-  }
-
-  let incomes = filtered.filter(t => t.type === 'pemasukan');
-  let expenses = filtered.filter(t => t.type === 'pengeluaran');
-
-  let inTotal = incomes.reduce((sum, t) => sum + t.amount, 0);
-  let exTotal = expenses.reduce((sum, t) => sum + t.amount, 0);
-  let netBalance = inTotal - exTotal;
-
-  let speech = `Laporan keuangan ${scope.label}. `;
-
-  if (incomes.length > 0) {
-    speech += "Rincian pemasukan: ";
-    speech += incomes.map(t => `${t.desc} ${t.amount.toLocaleString('id-ID')} rupiah`).join(', ') + ". ";
-  }
-
-  if (expenses.length > 0) {
-    speech += "Rincian pengeluaran: ";
-    speech += expenses.map(t => `${t.desc} ${t.amount.toLocaleString('id-ID')} rupiah`).join(', ') + ". ";
-  }
-
-  speech += `Total pemasukan ${inTotal.toLocaleString('id-ID')} rupiah, total pengeluaran ${exTotal.toLocaleString('id-ID')} rupiah. Sisa saldo bersih kamu adalah ${netBalance.toLocaleString('id-ID')} rupiah.`;
-
-  speak(speech.trim());
+  if (filtered.length === 0) return speak("Tidak ada catatan transaksi.");
+  let inTotal = filtered.filter(t => t.type === 'pemasukan').reduce((s, t) => s + t.amount, 0);
+  let exTotal = filtered.filter(t => t.type === 'pengeluaran').reduce((s, t) => s + t.amount, 0);
+  speak(`Total pemasukan ${inTotal.toLocaleString('id-ID')} rupiah, total pengeluaran ${exTotal.toLocaleString('id-ID')} rupiah.`);
 }
 
 async function processVoiceCommand(cmd) {
   const user = getCurrentUser(); 
   if (!user) { openLoginModal(); return; }
   
-  if (cmd.includes('edit') || cmd.includes('ubah') || cmd.includes('ganti')) { executeVoiceEdit(cmd); return; }
   if (cmd.includes('hapus') || cmd.includes('delete') || cmd.includes('buang')) { executeVoiceDelete(cmd); return; }
   if (cmd.includes('download') || cmd.includes('unduh') || cmd.includes('ekspor')) { executeVoiceDownload(cmd); return; }
   if (cmd.includes('grafik') || cmd.includes('chart')) { showChartModal(cmd); return; }
