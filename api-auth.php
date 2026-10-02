@@ -45,12 +45,12 @@ if ($action === 'register') {
             $mail->isSMTP();
             $mail->Host       = 'smtp.gmail.com';
             $mail->SMTPAuth   = true;
-            $mail->Username   = 'email_kamu@gmail.com';     // Ganti email pengirim
-            $mail->Password   = '16hurufsandiaplikasi';     // Ganti App Password Gmail
+            $mail->Username   = 'befast.id@gmail.com';     // Ganti email pengirim
+            $mail->Password   = 'qtbb bdzi mons pibm';     // Ganti App Password Gmail
             $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
             $mail->Port       = 587;
 
-            $mail->setFrom('email_kamu@gmail.com', 'BeFAST App');
+            $mail->setFrom('befast.id@gmail.com', 'BeFAST App');
             $mail->addAddress($email, $username);
 
             $verify_link = "https://befast.my.id/verify.php?token=" . $token;
