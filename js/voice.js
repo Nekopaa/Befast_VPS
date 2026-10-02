@@ -109,7 +109,6 @@ function speak(text) {
   window.speechSynthesis.speak(utterance);
 }
 
-// PARSER NOMINAL CERDAS (Mendukung angka numerik, juta, milyar, dan ratusan juta)
 function parseNominal(str) {
   if (!str) return 0;
   let raw = str.toLowerCase().replace(/tanggal\s*\d{1,2}/gi, '').replace(/tahun\s*\d{4}/gi, '').replace(/rp|rupiah/gi, '').trim();
@@ -171,6 +170,11 @@ function parseNominal(str) {
 
   total += currentSegment;
   return total > 0 ? total : 0;
+}
+
+function plainNumberIsValid(raw, joined) {
+  // Hanya ambil sebagai angka langsung jika tidak ada kata ribuan verbal yang rancu
+  return joined.length <= 8 && !raw.includes('ribu') && !raw.includes('juta');
 }
 
 function plainNumberIsValid(raw, joined) {
