@@ -7,37 +7,41 @@ $action = $_GET['action'] ?? '';
 // --- 1. PROSES REGISTER ---
 if ($action === 'register') {
     $data = json_decode(file_get_contents("php://input"), true);
-    
-    $username     = trim($data['username'] ?? '');
-    $email        = trim($data['email'] ?? '');
+    $username = trim($data['username'] ?? '');
+    $email = trim($data['email'] ?? '');
     $phone_number = trim($data['phone_number'] ?? '');
-    $password     = $data['password'] ?? '';
+    $password = $data['password'] ?? '';
 
     if (empty($username) || empty($email) || empty($password)) {
         echo json_encode(["success" => false, "message" => "Semua kolom wajib diisi!"]);
         exit;
     }
 
-    // Cek apakah email/username sudah terdaftar
     $stmt = $conn->prepare("SELECT id FROM users WHERE email = ? OR username = ?");
     $stmt->bind_param("ss", $email, $username);
     $stmt->execute();
     $stmt->store_result();
-
     if ($stmt->num_rows > 0) {
         echo json_encode(["success" => false, "message" => "Email atau Username sudah digunakan!"]);
         exit;
     }
     $stmt->close();
 
-    // Hash password agar aman
     $hashed_password = password_hash($password, PASSWORD_DEFAULT);
+    $token = bin2hex(random_bytes(32)); // Buat token acak 64 karakter
 
-// Simpan ke database
-    $insert = $conn->prepare("INSERT INTO users (id, username, email, phone_number, password) VALUES (UUID(), ?, ?, ?, ?)");
-    $insert->bind_param("ssss", $username, $email, $phone_number, $hashed_password);
+    $insert = $conn->prepare("INSERT INTO users (id, username, email, phone_number, password, verification_token, is_verified) VALUES (UUID(), ?, ?, ?, ?, ?, 0)");
+    $insert->bind_param("sssss", $username, $email, $phone_number, $hashed_password, $token);
 
     if ($insert->execute()) {
+        // Kirim Email Bawaan Server
+        $verify_link = "https://befast.my.id/verify.php?token=" . $token;
+        $subject = "Verifikasi Akun BeFAST";
+        $message = "Halo $username,\n\nTerima kasih sudah mendaftar di BeFAST. Klik link di bawah ini untuk mengaktifkan akunmu:\n$verify_link\n\nJika ini bukan kamu, abaikan saja email ini.";
+        $headers = "From: noreply@befast.my.id\r\n";
+        
+        mail($email, $subject, $message, $headers);
+
         echo json_encode(["success" => true, "message" => "Registrasi berhasil!"]);
     } else {
         echo json_encode(["success" => false, "message" => "Gagal mendaftarkan akun."]);

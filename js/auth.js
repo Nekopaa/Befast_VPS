@@ -32,8 +32,7 @@ function updateAuthUI() {
   if (user) {
     if (loggedOutDiv) loggedOutDiv.classList.add('hidden'); 
     if (loggedInDiv) { loggedInDiv.classList.remove('hidden'); loggedInDiv.classList.add('flex'); }
-    let fname = user.user_metadata?.full_name || 'User';
-    if(greetHead) greetHead.innerText = fname;
+    let fname = user.username || 'User';    if(greetHead) greetHead.innerText = fname;
     if(greetCent) greetCent.innerText = `${fname} 👋`;
     const savedPic = localStorage.getItem('bf_profile_' + user.id);
     if (typeof updateProfilePicUI === 'function') updateProfilePicUI(savedPic || null);
@@ -169,8 +168,7 @@ async function handleSignup(e) {
     if (!result.success) throw new Error(result.message);
     
     closeSignupModal();
-    alert("Pendaftaran berhasil! Silakan masuk.");
-    openLoginModal();
+    showVerifyEmailModal();
   } catch(err) { 
     showAlert('signupAlert', err.message); 
   } finally { 
