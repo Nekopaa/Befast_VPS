@@ -168,7 +168,7 @@ async function handleSignup(e) {
     if (!result.success) throw new Error(result.message);
     
     closeSignupModal();
-    showVerifyEmailModal();
+    showVerifyEmailModal(); // Memunculkan animasi popup cantik buatanmu
   } catch(err) { 
     showAlert('signupAlert', err.message); 
   } finally { 
