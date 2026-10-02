@@ -33,8 +33,8 @@ if ($action === 'register') {
     // Hash password agar aman
     $hashed_password = password_hash($password, PASSWORD_DEFAULT);
 
-    // Simpan ke database
-    $insert = $conn->prepare("INSERT INTO users (username, email, phone_number, password) VALUES (?, ?, ?, ?)");
+// Simpan ke database
+    $insert = $conn->prepare("INSERT INTO users (id, username, email, phone_number, password) VALUES (UUID(), ?, ?, ?, ?)");
     $insert->bind_param("ssss", $username, $email, $phone_number, $hashed_password);
 
     if ($insert->execute()) {

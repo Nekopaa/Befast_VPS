@@ -37,7 +37,7 @@ elseif ($method === 'POST') {$data = json_decode(file_get_contents("php://input"
         exit;
     }
 
-    $stmt =$conn->prepare("INSERT INTO transactions (user_id, date, type, category, amount, `desc`) VALUES (?, ?, ?, ?, ?, ?)");
+    $stmt =$conn->prepare("INSERT INTO transactions (id, user_id, date, type, category, amount, `desc`) VALUES (UUID(), ?, ?, ?, ?, ?, ?)");
     $stmt->bind_param("ssssis", $user_id,$date, $type,$category, $amount,$desc);
 
     if ($stmt->execute()) {
