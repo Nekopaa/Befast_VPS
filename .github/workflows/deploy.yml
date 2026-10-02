@@ -12,12 +12,12 @@ jobs:
       - name: Ambil kode terbaru dari GitHub
         uses: actions/checkout@v4
 
-      - name: Upload otomatis ke VPS via FTP
-        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+      - name: Upload otomatis ke VPS via SFTP
+        uses: appleboy/scp-action@master
         with:
-          server: ${{ secrets.FTP_SERVER }}
+          host: ${{ secrets.FTP_SERVER }}
           username: ${{ secrets.FTP_USERNAME }}
           password: ${{ secrets.FTP_PASSWORD }}
-          server-dir: /public_html/
-          port: 21
-          protocol: ftp
+          port: 22
+          source: "."
+          target: "/home/${{ secrets.FTP_USERNAME }}/public_html/"
