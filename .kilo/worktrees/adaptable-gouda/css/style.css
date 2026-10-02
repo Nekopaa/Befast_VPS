@@ -1,0 +1,183 @@
+@import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800;900&display=swap');
+
+/* --- VARIABEL WARNA 3 TEMA --- */
+:root, html[data-theme="default"] {
+  --bg-color: #f0f4f8;
+  --bg-img: url('../bg-room.jpg');
+  --card-bg: #ffffff;
+  --card-glass: rgba(255, 255, 255, 0.75);
+  --text-main: #1e3a8a;
+  --text-muted: #64748b;
+  --border-color: rgba(255, 255, 255, 0.5);
+  --primary: #496af1;
+  --primary-light: #eff6ff; /* Biru soft */
+}
+
+html[data-theme="dark"] {
+  --bg-color: #0f172a;
+  --bg-img: none;
+  --card-bg: #1e293b;
+  --card-glass: rgba(30, 41, 59, 0.85);
+  --text-main: #f8fafc;
+  --text-muted: #94a3b8;
+  --border-color: rgba(255, 255, 255, 0.1);
+  --primary: #818cf8;
+  --primary-light: rgba(129, 140, 248, 0.15);
+}
+
+html[data-theme="pink"] {
+  --bg-color: #fdf2f8;
+  --bg-img: none;
+  --card-bg: #fdf2f8;
+  --card-glass: rgba(253, 242, 248, 0.85);
+  --text-main: #831843;
+  --text-muted: #be185d;
+  --border-color: rgba(244, 114, 182, 0.3);
+  --primary: #ec4899;
+  --primary-light: rgba(236, 72, 153, 0.15);
+}
+
+html[data-theme="yellow"] {
+  --bg-color: #fefce8;
+  --bg-img: none;
+  --card-bg: #fefce8;
+  --card-glass: rgba(254, 252, 232, 0.85);
+  --text-main: #713f12;
+  --text-muted: #a16207;
+  --border-color: rgba(234, 179, 8, 0.3);
+  --primary: #eab308;
+  --primary-light: rgba(234, 179, 8, 0.15);
+}
+
+html[data-theme="green"] {
+  --bg-color: #f0fdf4;
+  --bg-img: none;
+  --card-bg: #f0fdf4;
+  --card-glass: rgba(240, 253, 244, 0.85);
+  --text-main: #14532d;
+  --text-muted: #15803d;
+  --border-color: rgba(34, 197, 94, 0.3);
+  --primary: #22c55e;
+  --primary-light: rgba(34, 197, 94, 0.15);
+}
+
+body {
+  font-family: 'Nunito', sans-serif;
+  background-color: var(--bg-color);
+  background-image: var(--bg-img);
+  background-size: cover;
+  background-position: center;
+  background-attachment: fixed;
+  color: var(--text-main);
+  letter-spacing: -0.01em;
+  height: 100vh;
+  transition: background-color 0.8s ease, color 0.8s ease;
+}
+
+/* --- EFEK SOROT AMBIGUITAS DESKTOP --- */
+.ambiguous-item {
+  cursor: pointer;
+  border: 2px dashed var(--primary) !important;
+  animation: pulseGlow 2s infinite;
+  transform: scale(1.02);
+  transition: all 0.2s ease;
+}
+.ambiguous-item:hover {
+  transform: scale(1.05);
+  background: var(--primary-light) !important;
+}
+@keyframes pulseGlow {
+  0% { box-shadow: 0 0 0 0 var(--primary-light); }
+  70% { box-shadow: 0 0 0 12px transparent; }
+  100% { box-shadow: 0 0 0 0 transparent; }
+}
+
+/* Transisi halus untuk semua elemen */
+body * { transition: background-color 0.4s ease, border-color 0.4s ease, color 0.4s ease; }
+
+/* Canvas Mesin Partikel */
+#themeFX { position: fixed; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: -1; }
+
+/* --- CLASS DINAMIS UNTUK TEMA --- */
+.theme-glass { background: var(--card-glass) !important; backdrop-filter: blur(16px); border: 1px solid var(--border-color) !important; }
+.theme-card { background: var(--card-bg) !important; border: 1px solid var(--border-color) !important; }
+.theme-text { color: var(--text-main) !important; }
+.theme-text-muted { color: var(--text-muted) !important; }
+.theme-primary { color: var(--primary) !important; }
+.theme-bg-primary { background-color: var(--primary) !important; color: #fff !important; }
+.theme-bg-light { background-color: var(--primary-light) !important; color: var(--primary) !important; }
+
+/* Panel Bawaan */
+.glass-panel { background: var(--card-glass); backdrop-filter: blur(16px); border: 1px solid var(--border-color); border-radius: 1.5rem; box-shadow: 0 10px 30px 0 rgba(0, 0, 0, 0.05); }
+.card-style { background-color: var(--card-bg); border: 1px solid var(--border-color); border-radius: 1.5rem; box-shadow: 0 10px 30px rgba(0,0,0,0.05); }
+
+/* --- ANIMASI MIC --- */
+.mic-idle { animation: micPulseIdle 3s infinite ease-in-out; }
+@keyframes micPulseIdle {
+  0% { box-shadow: 0 0 0 0 var(--primary-light); transform: scale(1); }
+  50% { box-shadow: 0 0 0 15px transparent; transform: scale(1.02); }
+  100% { box-shadow: 0 0 0 0 transparent; transform: scale(1); }
+}
+.mic-listening #micSonar { display: block; animation: micSonarActive 1s infinite ease-out; }
+.mic-listening { transform: scale(1.05) !important; box-shadow: 0 10px 25px var(--primary-light); }
+@keyframes micSonarActive { 0% { transform: scale(1); opacity: 1; border-width: 2px; } 100% { transform: scale(1.6); opacity: 0; border-width: 0px; } }
+
+@keyframes float { 0% { transform: translateY(0px); } 50% { transform: translateY(-12px); } 100% { transform: translateY(0px); } }
+.animate-float { animation: float 3s ease-in-out infinite; }
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+/* CUSTOM FLATPICKR */
+.flatpickr-calendar { border-radius: 24px !important; box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.15) !important; border: 1px solid var(--border-color) !important; padding: 15px 10px !important; font-family: inherit !important; width: 320px !important; background: var(--card-bg) !important; }
+.flatpickr-calendar::before, .flatpickr-calendar::after { display: none !important; }
+.flatpickr-months { margin-bottom: 15px !important; }
+.flatpickr-current-month { display: flex !important; align-items: center; justify-content: center; padding-top: 5px !important; }
+.flatpickr-current-month > .numInputWrapper { display: none !important; }
+.flatpickr-current-month > .flatpickr-monthDropdown-months { display: inline-block !important; }
+.flatpickr-monthDropdown-months, .flatpickr-custom-year-select { font-size: 1.1rem !important; font-weight: 800 !important; color: var(--text-main) !important; background: transparent !important; border: none !important; outline: none !important; cursor: pointer !important; appearance: none !important; -webkit-appearance: none !important; -moz-appearance: none !important; padding-right: 18px !important; padding-left: 8px !important; margin: 0 4px !important; border-radius: 6px !important; }
+.flatpickr-monthDropdown-months option, .flatpickr-custom-year-select option { color: var(--text-main); background: var(--card-bg); font-weight: 600; }
+span.flatpickr-weekday { color: var(--text-muted) !important; font-weight: 800 !important; font-size: 12px !important; }
+.flatpickr-day { border-radius: 50% !important; border: 2px solid transparent !important; color: var(--text-body) !important; font-weight: 700 !important; }
+.flatpickr-day:hover { background: var(--primary-light) !important; color: var(--primary) !important; }
+.flatpickr-day.selected { background: var(--primary) !important; color: white !important; }
+.flatpickr-day.today { border-color: #f59e0b !important; }
+
+/* --- CUSTOM SCROLLBAR ELEGAN & DIPAKSA MUNCUL --- */
+#transactionList {
+  scrollbar-width: thin; /* Untuk Firefox */
+  scrollbar-color: var(--primary) transparent; /* Untuk Firefox */
+}
+
+#transactionList::-webkit-scrollbar {
+  width: 6px !important;
+  display: block !important;
+}
+
+#transactionList::-webkit-scrollbar-track {
+  background: transparent !important;
+}
+
+#transactionList::-webkit-scrollbar-thumb {
+  background: var(--primary) !important; /* Mengikuti warna utama tema yang aktif */
+  border-radius: 10px !important;
+  opacity: 0.8;
+}
+
+#transactionList::-webkit-scrollbar-thumb:hover {
+  background: var(--text-main) !important;
+}
+
+/* MEMAKSA SCROLLBAR MUNCUL PADA WADAH ABSOLUT */
+.absolute.inset-0::-webkit-scrollbar {
+  width: 5px !important;
+  display: block !important;
+}
+
+.absolute.inset-0::-webkit-scrollbar-track {
+  background: transparent !important;
+}
+
+.absolute.inset-0::-webkit-scrollbar-thumb {
+  background: var(--primary) !important;
+  border-radius: 10px !important;
+}
